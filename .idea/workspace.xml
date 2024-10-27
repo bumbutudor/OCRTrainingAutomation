@@ -4,12 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6d05d7a2-8ff5-4e05-a450-0e62e47881e5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/FineReaderAutomation/Screen2/input.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/FineReaderAutomation/Screen2/train.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/Main.java" afterDir="false" />
+    <list default="true" id="6d05d7a2-8ff5-4e05-a450-0e62e47881e5" name="Changes" comment="Added training">
+      <change afterPath="$PROJECT_DIR$/README.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/AddLettersToVectorDB.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,8 +16,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Python Script" />
         <option value="Class" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
@@ -46,6 +43,7 @@
     "Application.APICall.executor": "Run",
     "Application.Main.executor": "Run",
     "Application.Test.executor": "Run",
+    "Application.VectorOCRAPI.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
@@ -53,9 +51,10 @@
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/Java jar's/sikulixide-2.0.5.jar",
     "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Libraries",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.26666668",
+    "settings.editor.selected.configurable": "preferences.lookFeel",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -121,9 +120,58 @@
       <updated>1729870351061</updated>
       <workItem from="1729870352125" duration="154000" />
     </task>
+    <task id="LOCAL-00001" summary="Added images for screen2">
+      <option name="closed" value="true" />
+      <created>1730025109507</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1730025109508</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Added images for screen2">
+      <option name="closed" value="true" />
+      <created>1730025128978</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1730025128978</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Added training">
+      <option name="closed" value="true" />
+      <created>1730047722934</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1730047722934</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Added training">
+      <option name="closed" value="true" />
+      <created>1730099298664</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1730099298664</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Added images for screen2" />
+    <MESSAGE value="Added training" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added training" />
   </component>
 </project>

@@ -7,6 +7,10 @@ import java.awt.Toolkit;
 import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.file.Files;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 
@@ -18,6 +22,7 @@ public class Main {
     private static final String PATTERN_TRAINING_WINDOW = IMAGE_FOLDER + "pattern_training_window.png";
     private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Imaginea butonului "Skip" sau "Train"
     private static final String INPUT = IMAGE_FOLDER + "input.png"; // Imaginea casetei de input
+    private static final String TRAIN = IMAGE_FOLDER + "train.png";
 
     // Contor pentru numele fișierelor de caractere
     private static int characterCounter = 1;
@@ -90,37 +95,41 @@ public class Main {
                 ImageIO.write(processedCharacterImage, "png", processedCharacterImageFile);
                 System.out.println("Imaginea procesată a caracterului a fost salvată la: " + processedCharacterImageFile.getAbsolutePath());
 
-                // Copiază imaginea procesată în clipboard
-                copyImageToClipboard(processedCharacterImage);
-                System.out.println("Caracterul a fost procesat și copiat în clipboard!");
+                // Trimite imaginea procesată la API și obține caracterul recunoscut
+                String recognizedCharacter = recognizeCharacter(processedCharacterImageFile.getAbsolutePath());
 
-                // Interacționează cu caseta de input pentru a copia caracterul recunoscut
-                Pattern inputBoxPattern = new Pattern(INPUT);
-                screen.wait(inputBoxPattern, 15);
-                Region inputBoxRegion = screen.find(inputBoxPattern);
+                if (recognizedCharacter != null && !recognizedCharacter.isEmpty()) {
+                    System.out.println("Caracter recunoscut: " + recognizedCharacter);
 
-                // Click pe caseta de input
-                screen.click(inputBoxRegion);
+                    // Copiază caracterul recunoscut în clipboard
+                    copyTextToClipboard(recognizedCharacter);
 
-                // Selectează tot textul și copiază în clipboard
-                screen.type("a", KeyModifier.CTRL); // Ctrl+A (Select All)
-                screen.type("c", KeyModifier.CTRL); // Ctrl+C (Copy)
+                    // Interacționează cu caseta de input pentru a insera caracterul recunoscut
+                    Pattern inputBoxPattern = new Pattern(INPUT);
+                    screen.wait(inputBoxPattern, 15);
+                    Region inputBoxRegion = screen.find(inputBoxPattern);
 
-                // Așteaptă puțin pentru a asigura copierea
-                Thread.sleep(500);
+                    // Plasează mouse-ul pe caseta de input și face click
+                    screen.click(inputBoxRegion);
 
-                // Obține textul din clipboard
-                String copiedText = getClipboardText();
+                    // Șterge tot din casetă (Ctrl+A și Backspace)
+                    screen.type("a", KeyModifier.CTRL); // Selectează tot textul
+                    screen.type(Key.BACKSPACE); // Șterge textul selectat
 
-                if (isValidCharacter(copiedText)) {
-                    String character = copiedText.trim();
+                    // Lipește caracterul din clipboard (Ctrl+V)
+                    screen.type("v", KeyModifier.CTRL); // Simulează Ctrl+V pentru a lipi textul
 
-                    // Creează un folder cu numele caracterului dacă nu există
-                    String characterFolderPath = uniqueOutputFolder + character + "\\";
+                    // Apasă butonul "Train"
+                    Pattern nextButtonPattern = new Pattern(NEXT_BUTTON);
+                    screen.wait(nextButtonPattern, 10);
+                    screen.click(nextButtonPattern);
+
+                    // Opțional: Mută imaginea procesată în folderul caracterului
+                    String characterFolderPath = uniqueOutputFolder + recognizedCharacter + "\\";
                     File characterFolder = new File(characterFolderPath);
                     if (!characterFolder.exists()) {
                         characterFolder.mkdirs();
-                        System.out.println("Folder creat pentru caracterul: " + character);
+                        System.out.println("Folder creat pentru caracterul: " + recognizedCharacter);
                     }
 
                     // Mută imaginea procesată în folderul caracterului
@@ -133,17 +142,13 @@ public class Main {
                     } else {
                         System.out.println("Eroare la mutarea imaginii procesate a caracterului.");
                     }
+
                 } else {
-                    System.out.println("Caracter invalid sau gol. Imaginea procesată nu va fi mutată.");
+                    System.out.println("Eroare la recunoașterea caracterului din imagine.");
                 }
 
                 // Crește contorul pentru următorul caracter
                 characterCounter++;
-
-                // Apasă butonul "Next" sau "Train" pentru a trece la următorul caracter
-                Pattern skipButtonPattern = new Pattern(NEXT_BUTTON);
-                screen.wait(skipButtonPattern, 10);
-                screen.click(skipButtonPattern);
             }
 
             System.out.println("Procesarea caracterelor s-a încheiat.");
@@ -152,17 +157,63 @@ public class Main {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
-        } catch (UnsupportedFlavorException e) {
-            e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+
+    // Metoda pentru a trimite imaginea la API și a obține caracterul recunoscut
+    public static String recognizeCharacter(String imagePath) {
+        String urlString = "http://localhost:8000/predict/"; // Înlocuiți cu URL-ul corect al API-ului dvs.
+
+        try {
+            // Deschide o conexiune către API
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=---ContentBoundary");
+            connection.setDoOutput(true);
+
+            // Creează corpul multipart
+            OutputStream outputStream = connection.getOutputStream();
+            outputStream.write(("-----ContentBoundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" +
+                    new File(imagePath).getName() + "\"\r\nContent-Type: image/png\r\n\r\n").getBytes());
+
+            // Scrie bytes-urile fișierului imagine în fluxul de ieșire
+            Files.copy(new File(imagePath).toPath(), outputStream);
+            outputStream.write("\r\n-----ContentBoundary--\r\n".getBytes());
+            outputStream.flush();
+            outputStream.close();
+
+            // Obține răspunsul
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) {
+                String response = new String(connection.getInputStream().readAllBytes());
+                System.out.println("Răspuns de la API: " + response);
+
+                // Elimină ghilimelele de la început și sfârșit, dacă există
+                response = response.trim();
+                if (response.startsWith("\"") && response.endsWith("\"") && response.length() >= 2) {
+                    response = response.substring(1, response.length() - 1);
+                }
+
+                return response;
+            } else {
+                System.err.println("Eroare la apelul API: " + responseCode);
+                return null;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
     // Metoda pentru a detecta caseta verde în imagine
     public static Region detectGreenBox(Region trainingWindowRegion, BufferedImage trainingBufferedImage) {
         // Definim culoarea verde specifică casetei
-        Color targetColor = new Color(0, 192, 0); // Ajustează valorile RGB dacă este necesar
+        Color targetColor = new Color(128, 220, 128, 255); // Ajustează valorile RGB dacă este necesar
         int colorTolerance = 30; // Toleranța culorii (poți ajusta această valoare)
 
         // Variabile pentru coordonate
@@ -171,9 +222,9 @@ public class Main {
         int maxX = 0;
         int maxY = 0;
 
-        // Parcurgem pixelii imaginii
-        for (int y = 0; y < trainingBufferedImage.getHeight(); y++) {
-            for (int x = 0; x < trainingBufferedImage.getWidth(); x++) {
+        // Parcurgem pixelii imaginii, începând de la stânga
+        for (int x = 0; x < trainingBufferedImage.getWidth(); x++) {
+            for (int y = 0; y < trainingBufferedImage.getHeight(); y++) {
                 int pixelColor = trainingBufferedImage.getRGB(x, y);
                 Color color = new Color(pixelColor, true); // Al doilea parametru 'true' pentru a include alfa
 
@@ -196,14 +247,16 @@ public class Main {
         // Determinăm coordonatele casetei verzi în raport cu ecranul
         int greenBoxX = trainingWindowRegion.getX() + minX;
         int greenBoxY = trainingWindowRegion.getY() + minY;
-        int greenBoxW = maxX - minX;
-        int greenBoxH = maxY - minY;
+        int greenBoxW = maxX - minX + 1;
+        int greenBoxH = maxY - minY + 1;
 
         // Creăm regiunea casetei verzi
         Region greenBoxRegion = new Region(greenBoxX, greenBoxY, greenBoxW, greenBoxH);
 
         return greenBoxRegion;
     }
+
+
 
     // Metodă pentru a verifica dacă două culori se potrivesc în limitele unei toleranțe
     public static boolean isColorMatch(Color c1, Color c2, int tolerance) {
@@ -214,7 +267,7 @@ public class Main {
         return (diffRed <= tolerance) && (diffGreen <= tolerance) && (diffBlue <= tolerance);
     }
 
-    // Metoda pentru a procesa imaginea caracterului, păstrând doar pixelii negri
+// Metoda pentru a procesa imaginea caracterului, păstrând toate nuanțele de gri
     public static BufferedImage processCharacterImage(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
@@ -226,8 +279,9 @@ public class Main {
                 int pixelColor = image.getRGB(x, y);
                 Color color = new Color(pixelColor, true);
 
-                if (color.getRed() == 0 && color.getGreen() == 0 && color.getBlue() == 0) {
-                    // Păstrează pixelul negru
+                // Verifică dacă pixelul este în nuanțe de gri (R, G și B sunt egale)
+                if (color.getRed() == color.getGreen() && color.getGreen() == color.getBlue()) {
+                    // Păstrează pixelul în nuanțe de gri
                     processedImage.setRGB(x, y, pixelColor);
                 } else {
                     // Setează alți pixeli ca fiind albi
@@ -237,6 +291,12 @@ public class Main {
         }
 
         return processedImage;
+    }
+
+    public static void copyTextToClipboard(String text) {
+        StringSelection stringSelection = new StringSelection(text);
+        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+        clipboard.setContents(stringSelection, null);
     }
 
     // Metoda pentru a copia o imagine în clipboard
