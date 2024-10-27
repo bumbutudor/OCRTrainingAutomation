@@ -13,8 +13,8 @@ import javax.imageio.ImageIO;
 public class Main {
     private static Screen screen = new Screen();
 
-    private static final String IMAGE_FOLDER = "C:\\Users\\bumbu\\IdeaProjects\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\";
-    private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR16_icon.png";
+    private static final String IMAGE_FOLDER = "C:\\Users\\mariu\\Desktop\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\Screen2\\";
+    private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR15_icon.png";
     private static final String PATTERN_TRAINING_WINDOW = IMAGE_FOLDER + "pattern_training_window.png";
     private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Imaginea butonului "Skip" sau "Train"
     private static final String INPUT = IMAGE_FOLDER + "input.png"; // Imaginea casetei de input
