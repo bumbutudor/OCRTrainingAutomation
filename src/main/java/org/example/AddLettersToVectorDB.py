@@ -12,6 +12,9 @@ from tensorflow.keras.preprocessing import image as keras_image
 import numpy as np
 import tensorflow as tf
 
+# Path to the base dataset directory
+BASE_DATASET_PATH = "C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\"
+
 # Connection parameters for local Docker Weaviate instance
 connection_params = ConnectionParams.from_params(
     http_host="localhost",  # This matches the Docker port mapping
@@ -90,42 +93,42 @@ with WeaviateClient(connection_params=connection_params) as client:
 
         # Add training images to Weaviate
         TRAINING_FOLDERS = {
-            'а': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\а',
-            'б': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\б',
-            'ꙗ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ꙗ',
-            'и': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\и',
-            'н': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\н',
-            'в': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\в',
-            'о': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\о',
-            'р': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\р',
-            'ѫ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ѫ',
-            'с': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\с',
-            'т': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\т',
-            'г': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\г',
-            'д': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\д',
-            'є': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\є',
-            'ж': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ж',
-            'з': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\з',
-            'ї': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ї',
-            'к': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\к',
-            'л': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\л',
-            'м': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\м',
-            'п': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\п',
-            'ꙋ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ꙋ',
-            'у': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\у',
-            'ф': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ф',
-            'х': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\х',
-            'ц': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ц',
-            'ѡ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ѡ',
-            'ч': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ч',
-            'ш': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ш',
-            'щ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\щ',
-            'ъ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ъ',
-            'ь': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ь',
-            'ѣ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ѣ',
-            'ѧ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ѧ',
-            'ꙟ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\ꙟ',
-            'џ': 'C:\\Users\\mariu\\Desktop\\Vector based OCR\\.ipynb_checkpoints\\LettersDataset20\\џ'
+            'а': f'{BASE_DATASET_PATH}а',
+            'б': f'{BASE_DATASET_PATH}б',
+            'ꙗ': f'{BASE_DATASET_PATH}ꙗ',
+            'и': f'{BASE_DATASET_PATH}и',
+            'н': f'{BASE_DATASET_PATH}н',
+            'в': f'{BASE_DATASET_PATH}в',
+            'о': f'{BASE_DATASET_PATH}о',
+            'р': f'{BASE_DATASET_PATH}р',
+            'ѫ': f'{BASE_DATASET_PATH}ѫ',
+            'с': f'{BASE_DATASET_PATH}с',
+            'т': f'{BASE_DATASET_PATH}т',
+            'г': f'{BASE_DATASET_PATH}г',
+            'д': f'{BASE_DATASET_PATH}д',
+            'є': f'{BASE_DATASET_PATH}є',
+            'ж': f'{BASE_DATASET_PATH}ж',
+            'з': f'{BASE_DATASET_PATH}з',
+            'ї': f'{BASE_DATASET_PATH}ї',
+            'к': f'{BASE_DATASET_PATH}к',
+            'л': f'{BASE_DATASET_PATH}л',
+            'м': f'{BASE_DATASET_PATH}м',
+            'п': f'{BASE_DATASET_PATH}п',
+            'ꙋ': f'{BASE_DATASET_PATH}ꙋ',
+            'у': f'{BASE_DATASET_PATH}у',
+            'ф': f'{BASE_DATASET_PATH}ф',
+            'х': f'{BASE_DATASET_PATH}х',
+            'ц': f'{BASE_DATASET_PATH}ц',
+            'ѡ': f'{BASE_DATASET_PATH}ѡ',
+            'ч': f'{BASE_DATASET_PATH}ч',
+            'ш': f'{BASE_DATASET_PATH}ш',
+            'щ': f'{BASE_DATASET_PATH}щ',
+            'ъ': f'{BASE_DATASET_PATH}ъ',
+            'ь': f'{BASE_DATASET_PATH}ь',
+            'ѣ': f'{BASE_DATASET_PATH}ѣ',
+            'ѧ': f'{BASE_DATASET_PATH}ѧ',
+            'ꙟ': f'{BASE_DATASET_PATH}ꙟ',
+            'џ': f'{BASE_DATASET_PATH}џ'
         }
 
         for label, folder_path in TRAINING_FOLDERS.items():

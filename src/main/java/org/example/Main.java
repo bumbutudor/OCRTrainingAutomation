@@ -120,7 +120,7 @@ public class Main {
                     screen.type("v", KeyModifier.CTRL); // Simulează Ctrl+V pentru a lipi textul
 
                     // Apasă butonul "Train"
-                    Pattern nextButtonPattern = new Pattern(NEXT_BUTTON);
+                    Pattern nextButtonPattern = new Pattern(TRAIN);
                     screen.wait(nextButtonPattern, 10);
                     screen.click(nextButtonPattern);
 
