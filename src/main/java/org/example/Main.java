@@ -1,13 +1,12 @@
 package org.example;
 
 import org.sikuli.script.*;
+import javax.swing.*;
 import java.awt.datatransfer.*;
 import java.awt.image.BufferedImage;
 import java.awt.Toolkit;
 import java.awt.Color;
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
+import java.io.*;
 import javax.imageio.ImageIO;
 
 public class Main {
@@ -16,137 +15,184 @@ public class Main {
     private static final String IMAGE_FOLDER = "C:\\Users\\mariu\\Desktop\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\Screen2\\";
     private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR15_icon.png";
     private static final String PATTERN_TRAINING_WINDOW = IMAGE_FOLDER + "pattern_training_window.png";
-    private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Imaginea butonului "Skip" sau "Train"
-    private static final String INPUT = IMAGE_FOLDER + "input.png"; // Imaginea casetei de input
+    private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Image of the "Skip" or "Train" button
+    private static final String INPUT = IMAGE_FOLDER + "input.png"; // Image of the input box
 
-    // Contor pentru numele fișierelor de caractere
+    // Counter for character file names
     private static int characterCounter = 1;
 
     public static void main(String[] args) {
         try {
-            // Creează un folder de output unic pentru sesiune
-            String uniqueOutputFolder = IMAGE_FOLDER + "output_" + UUID.randomUUID().toString() + "\\";
-            File outputDir = new File(uniqueOutputFolder);
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
-            }
+            String outputFolder;
 
-            // Pasul 1: Deschide ABBYY FineReader
-            Pattern fineReaderIconPattern = new Pattern(FINEREADER_ICON);
-            screen.wait(fineReaderIconPattern, 10);
-            screen.doubleClick(fineReaderIconPattern); // Deschide programul
+            // Prompt the user for the folder name
+            String folderName = JOptionPane.showInputDialog(null,
+                    "Enter the folder name where the program should work:",
+                    "Folder Selection",
+                    JOptionPane.PLAIN_MESSAGE);
 
-            // Așteaptă ca FineReader să se deschidă complet
-            Pattern patternTrainingWindowPattern = new Pattern(PATTERN_TRAINING_WINDOW);
-            screen.wait(patternTrainingWindowPattern, 15);
-            Region trainingWindowRegion = screen.find(patternTrainingWindowPattern);
-
-            // Verifică dacă regiunea a fost găsită
-            if (trainingWindowRegion == null) {
-                System.out.println("Nu a fost găsită fereastra de antrenare!");
+            // Check if the user provided a folder name
+            if (folderName == null || folderName.trim().isEmpty()) {
+                JOptionPane.showMessageDialog(null,
+                        "No folder name provided. The program will exit.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Bucla principală pentru procesarea caracterelor
+            // Construct the output folder path
+            outputFolder = IMAGE_FOLDER + folderName.trim() + File.separator;
+
+            // Ensure the folder exists or create it
+            File outputDir = new File(outputFolder);
+            if (!outputDir.exists()) {
+                boolean dirCreated = outputDir.mkdirs();
+                if (dirCreated) {
+                    System.out.println("Folder created at: " + outputFolder);
+                } else {
+                    JOptionPane.showMessageDialog(null,
+                            "Failed to create the folder. The program will exit.",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+            } else {
+                System.out.println("Using existing folder at: " + outputFolder);
+            }
+
+            // Step 1: Open ABBYY FineReader
+            Pattern fineReaderIconPattern = new Pattern(FINEREADER_ICON);
+            screen.wait(fineReaderIconPattern, 10);
+            screen.doubleClick(fineReaderIconPattern); // Open the program
+
+            // Wait for FineReader to fully open
+            Pattern patternTrainingWindowPattern = new Pattern(PATTERN_TRAINING_WINDOW).similar(0.5);
+            screen.wait(patternTrainingWindowPattern, 15);
+            Region trainingWindowRegion = screen.find(patternTrainingWindowPattern);
+
+            // Check if the region was found
+            if (trainingWindowRegion == null) {
+                System.out.println("Training window not found!");
+                return;
+            }
+
+            // Main loop for processing characters
             while (true) {
-                Thread.sleep(1000); // Pauză pentru stabilizarea interfeței
+                Thread.sleep(1000); // Pause to stabilize the interface
 
-                // Capturează imaginea ferestrei de antrenare
-                ScreenImage trainingWindowImage = screen.capture(trainingWindowRegion);
-                BufferedImage trainingBufferedImage = trainingWindowImage.getImage();
+                // Initialize variables for green box detection
+                Region greenBoxRegion = null;
+                long startTime = System.currentTimeMillis();
+                long elapsedTime = 0;
+                long maxWaitTime = 20000; // 10 seconds in milliseconds
 
-                // Salvează imaginea ferestrei de antrenare pentru verificare (opțional)
-                File trainingWindowFile = new File(uniqueOutputFolder + "last_training_window.png");
-                ImageIO.write(trainingBufferedImage, "png", trainingWindowFile);
-                System.out.println("Screenshot al ferestrei de antrenare salvat la: " + trainingWindowFile.getAbsolutePath());
+                // Loop to wait for the green box for up to 5 seconds
+                while (elapsedTime < maxWaitTime) {
+                    // Capture the training window image
+                    ScreenImage trainingWindowImage = screen.capture(trainingWindowRegion);
+                    BufferedImage trainingBufferedImage = trainingWindowImage.getImage();
 
-                // Detectează caseta verde în imagine
-                Region greenBoxRegion = detectGreenBox(trainingWindowRegion, trainingBufferedImage);
+                    // Save the training window image for verification (optional)
+                    File trainingWindowFile = new File(outputFolder + "last_training_window.png");
+                    ImageIO.write(trainingBufferedImage, "png", trainingWindowFile);
+                    // System.out.println("Training window screenshot saved at: " + trainingWindowFile.getAbsolutePath());
 
-                if (greenBoxRegion == null) {
-                    System.out.println("Nu a fost găsită caseta verde în fereastra de antrenare!");
-                    break; // Ieși din buclă dacă nu mai există caseta verde
+                    // Detect the green box in the image
+                    greenBoxRegion = detectGreenBox(trainingWindowRegion, trainingBufferedImage);
+
+                    if (greenBoxRegion != null) {
+                        break; // Green box found, exit the waiting loop
+                    }
+
+                    // Wait before the next attempt
+                    Thread.sleep(500); // Wait for 500 milliseconds
+                    elapsedTime = System.currentTimeMillis() - startTime;
                 }
 
-                // Evidențiază regiunea casetei verzi timp de 1 secundă
-                greenBoxRegion.highlight(1); // Evidențiază timp de 1 secundă
+                if (greenBoxRegion == null) {
+                    System.out.println("Green box not found in the training window after 5 seconds!");
+                    break; // Exit the main loop if the green box isn't found within 5 seconds
+                }
 
-                // Capturează imaginea caracterului din caseta verde
+                // Highlight the green box region for 1 second
+                greenBoxRegion.highlight(1); // Highlight for 1 second
+
+                // Capture the character image from the green box
                 ScreenImage characterImage = screen.capture(greenBoxRegion);
                 BufferedImage characterBufferedImage = characterImage.getImage();
 
-                // Salvează imaginea originală a caracterului
-                String originalCharacterImagePath = uniqueOutputFolder + "character_" + characterCounter + "_original.png";
+                // Save the original character image
+                String originalCharacterImagePath = outputFolder + "character_" + characterCounter + "_original.png";
                 File originalCharacterImageFile = new File(originalCharacterImagePath);
                 ImageIO.write(characterBufferedImage, "png", originalCharacterImageFile);
-                System.out.println("Imaginea originală a caracterului a fost salvată la: " + originalCharacterImageFile.getAbsolutePath());
+                System.out.println("Original character image saved at: " + originalCharacterImageFile.getAbsolutePath());
 
-                // Procesează imaginea pentru a elimina pixeli diferiți de negru
+                // Process the image to remove non-gray pixels
                 BufferedImage processedCharacterImage = processCharacterImage(characterBufferedImage);
 
-                // Salvează imaginea procesată a caracterului
-                String processedCharacterImagePath = uniqueOutputFolder + "character_" + characterCounter + "_processed.png";
+                // Save the processed character image
+                String processedCharacterImagePath = outputFolder + "character_" + characterCounter + "_processed.png";
                 File processedCharacterImageFile = new File(processedCharacterImagePath);
                 ImageIO.write(processedCharacterImage, "png", processedCharacterImageFile);
-                System.out.println("Imaginea procesată a caracterului a fost salvată la: " + processedCharacterImageFile.getAbsolutePath());
+                System.out.println("Processed character image saved at: " + processedCharacterImageFile.getAbsolutePath());
 
-                // Copiază imaginea procesată în clipboard
+                // Copy the processed image to clipboard
                 copyImageToClipboard(processedCharacterImage);
-                System.out.println("Caracterul a fost procesat și copiat în clipboard!");
+                System.out.println("Character processed and copied to clipboard!");
 
-                // Interacționează cu caseta de input pentru a copia caracterul recunoscut
+                // Interact with the input box to copy the recognized character
                 Pattern inputBoxPattern = new Pattern(INPUT);
                 screen.wait(inputBoxPattern, 15);
                 Region inputBoxRegion = screen.find(inputBoxPattern);
 
-                // Click pe caseta de input
+                // Click on the input box
                 screen.click(inputBoxRegion);
 
-                // Selectează tot textul și copiază în clipboard
+                // Select all text and copy to clipboard
                 screen.type("a", KeyModifier.CTRL); // Ctrl+A (Select All)
                 screen.type("c", KeyModifier.CTRL); // Ctrl+C (Copy)
 
-                // Așteaptă puțin pentru a asigura copierea
+                // Wait a bit to ensure copying
                 Thread.sleep(500);
 
-                // Obține textul din clipboard
+                // Get text from clipboard
                 String copiedText = getClipboardText();
 
                 if (isValidCharacter(copiedText)) {
                     String character = copiedText.trim();
 
-                    // Creează un folder cu numele caracterului dacă nu există
-                    String characterFolderPath = uniqueOutputFolder + character + "\\";
+                    // Create a folder with the character's name if it doesn't exist
+                    String characterFolderPath = outputFolder + character + File.separator;
                     File characterFolder = new File(characterFolderPath);
                     if (!characterFolder.exists()) {
                         characterFolder.mkdirs();
-                        System.out.println("Folder creat pentru caracterul: " + character);
+                        System.out.println("Folder created for character: " + character);
                     }
 
-                    // Mută imaginea procesată în folderul caracterului
+                    // Move the processed image to the character's folder
                     File sourceFile = processedCharacterImageFile;
                     File destFile = new File(characterFolderPath + sourceFile.getName());
 
                     boolean success = sourceFile.renameTo(destFile);
                     if (success) {
-                        System.out.println("Imaginea procesată a caracterului a fost mutată în folderul: " + destFile.getAbsolutePath());
+                        System.out.println("Processed character image moved to folder: " + destFile.getAbsolutePath());
                     } else {
-                        System.out.println("Eroare la mutarea imaginii procesate a caracterului.");
+                        System.out.println("Error moving processed character image.");
                     }
                 } else {
-                    System.out.println("Caracter invalid sau gol. Imaginea procesată nu va fi mutată.");
+                    System.out.println("Invalid or empty character. Processed image will not be moved.");
                 }
 
-                // Crește contorul pentru următorul caracter
+                // Increment the counter for the next character
                 characterCounter++;
 
-                // Apasă butonul "Next" sau "Train" pentru a trece la următorul caracter
+                // Press the "Next" or "Train" button to proceed to the next character
                 Pattern skipButtonPattern = new Pattern(NEXT_BUTTON);
                 screen.wait(skipButtonPattern, 10);
                 screen.click(skipButtonPattern);
             }
 
-            System.out.println("Procesarea caracterelor s-a încheiat.");
+            System.out.println("Character processing completed.");
 
         } catch (FindFailed e) {
             e.printStackTrace();
@@ -154,32 +200,32 @@ public class Main {
             e.printStackTrace();
         } catch (UnsupportedFlavorException e) {
             e.printStackTrace();
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    // Metoda pentru a detecta caseta verde în imagine
+    // Method to detect the green box in the image
     public static Region detectGreenBox(Region trainingWindowRegion, BufferedImage trainingBufferedImage) {
-        // Definim culoarea verde specifică casetei
-        Color targetColor = new Color(128, 220, 128, 255); // Ajustează valorile RGB dacă este necesar
-        int colorTolerance = 30; // Toleranța culorii (poți ajusta această valoare)
+        // Define the specific green color of the box
+        Color targetColor = new Color(128, 220, 128, 255); // Adjust RGB values if necessary
+        int colorTolerance = 30; // Color tolerance (adjust this value if needed)
 
-        // Variabile pentru coordonate
+        // Variables for coordinates
         int minX = trainingBufferedImage.getWidth();
         int minY = trainingBufferedImage.getHeight();
         int maxX = 0;
         int maxY = 0;
 
-        // Parcurgem pixelii imaginii
+        // Iterate over the image pixels
         for (int y = 0; y < trainingBufferedImage.getHeight(); y++) {
             for (int x = 0; x < trainingBufferedImage.getWidth(); x++) {
                 int pixelColor = trainingBufferedImage.getRGB(x, y);
-                Color color = new Color(pixelColor, true); // Al doilea parametru 'true' pentru a include alfa
+                Color color = new Color(pixelColor, true); // Include alpha
 
-                // Verificăm dacă pixelul este verde în limitele toleranței
+                // Check if the pixel is green within the tolerance limits
                 if (isColorMatch(color, targetColor, colorTolerance)) {
-                    // Actualizăm coordonatele extreme
+                    // Update extreme coordinates
                     if (x < minX) minX = x;
                     if (x > maxX) maxX = x;
                     if (y < minY) minY = y;
@@ -188,24 +234,24 @@ public class Main {
             }
         }
 
-        // Verificăm dacă am găsit coordonatele casetei verzi
+        // Check if we found the green box coordinates
         if (minX >= maxX || minY >= maxY) {
-            return null; // Caseta verde nu a fost găsită
+            return null; // Green box not found
         }
 
-        // Determinăm coordonatele casetei verzi în raport cu ecranul
+        // Determine the green box coordinates relative to the screen
         int greenBoxX = trainingWindowRegion.getX() + minX;
         int greenBoxY = trainingWindowRegion.getY() + minY;
         int greenBoxW = maxX - minX;
         int greenBoxH = maxY - minY;
 
-        // Creăm regiunea casetei verzi
+        // Create the green box region
         Region greenBoxRegion = new Region(greenBoxX, greenBoxY, greenBoxW, greenBoxH);
 
         return greenBoxRegion;
     }
 
-    // Metodă pentru a verifica dacă două culori se potrivesc în limitele unei toleranțe
+    // Method to check if two colors match within a tolerance
     public static boolean isColorMatch(Color c1, Color c2, int tolerance) {
         int diffRed = Math.abs(c1.getRed() - c2.getRed());
         int diffGreen = Math.abs(c1.getGreen() - c2.getGreen());
@@ -214,7 +260,7 @@ public class Main {
         return (diffRed <= tolerance) && (diffGreen <= tolerance) && (diffBlue <= tolerance);
     }
 
-// Metoda pentru a procesa imaginea caracterului, păstrând toate nuanțele de gri
+    // Method to process the character image, keeping all shades of gray
     public static BufferedImage processCharacterImage(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
@@ -226,12 +272,12 @@ public class Main {
                 int pixelColor = image.getRGB(x, y);
                 Color color = new Color(pixelColor, true);
 
-                // Verifică dacă pixelul este în nuanțe de gri (R, G și B sunt egale)
+                // Check if the pixel is in shades of gray (R, G, and B are equal)
                 if (color.getRed() == color.getGreen() && color.getGreen() == color.getBlue()) {
-                    // Păstrează pixelul în nuanțe de gri
+                    // Keep the pixel in shades of gray
                     processedImage.setRGB(x, y, pixelColor);
                 } else {
-                    // Setează alți pixeli ca fiind albi
+                    // Set other pixels to white
                     processedImage.setRGB(x, y, Color.WHITE.getRGB());
                 }
             }
@@ -240,14 +286,14 @@ public class Main {
         return processedImage;
     }
 
-    // Metoda pentru a copia o imagine în clipboard
+    // Method to copy an image to the clipboard
     public static void copyImageToClipboard(BufferedImage image) {
         TransferableImage trans = new TransferableImage(image);
         Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
         c.setContents(trans, null);
     }
 
-    // Clasă internă pentru a face imaginea transferabilă în clipboard
+    // Inner class to make the image transferable to the clipboard
     static class TransferableImage implements Transferable {
         private BufferedImage image;
 
@@ -272,7 +318,7 @@ public class Main {
         }
     }
 
-    // Metoda pentru a obține textul din clipboard
+    // Method to get text from the clipboard
     public static String getClipboardText() throws UnsupportedFlavorException, IOException {
         Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         Transferable contents = clipboard.getContents(null);
@@ -284,15 +330,14 @@ public class Main {
         return "";
     }
 
-    // Metoda pentru a verifica dacă textul copiat este un caracter valid
+    // Method to check if the copied text is a valid character
     public static boolean isValidCharacter(String text) {
         if (text == null || text.trim().isEmpty()) {
             return false;
         }
         text = text.trim();
-        // Utilizează regex pentru a verifica dacă textul începe cu o literă sau cifră,
-        // urmată de zero sau mai multe semne diacritice
+        // Use regex to check if the text starts with a letter or number,
+        // followed by zero or more diacritical marks
         return text.matches("^[\\p{L}\\p{N}][\\p{M}]*$");
     }
-
 }
