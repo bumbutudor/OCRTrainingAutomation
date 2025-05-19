@@ -99,7 +99,7 @@ public class Main {
                 Region greenBoxRegion = null;
                 long startTime = System.currentTimeMillis();
                 long elapsedTime = 0;
-                long maxWaitTime = 900000; // 10 seconds in milliseconds
+                long maxWaitTime = 5000; // 5 seconds in milliseconds
 
                 // Loop to wait for the green box for up to 5 seconds
                 while (elapsedTime < maxWaitTime) {
