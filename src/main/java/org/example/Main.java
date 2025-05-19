@@ -7,16 +7,31 @@ import java.awt.image.BufferedImage;
 import java.awt.Toolkit;
 import java.awt.Color;
 import java.io.*;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import javax.imageio.ImageIO;
 
 public class Main {
     private static Screen screen = new Screen();
 
-    private static final String IMAGE_FOLDER = "C:\\Users\\mariu\\Desktop\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\Screen2\\";
-    private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR15_icon.png";
-    private static final String PATTERN_TRAINING_WINDOW = IMAGE_FOLDER + "pattern_training_window.png";
-    private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Image of the "Skip" or "Train" button
-    private static final String INPUT = IMAGE_FOLDER + "input.png"; // Image of the input box
+    private static final String IMAGE_FOLDER;
+    private static final String FINEREADER_ICON;
+    private static final String PATTERN_TRAINING_WINDOW;
+    private static final String NEXT_BUTTON; // Image of the "Skip" or "Train" button
+    private static final String INPUT; // Image of the input box
+
+    static {
+        try {
+            String basePath = Paths.get(Main.class.getResource("/FineReaderAutomation/Screen2").toURI()).toString() + File.separator;
+            IMAGE_FOLDER = basePath;
+            FINEREADER_ICON = basePath + "FR15_icon.png";
+            PATTERN_TRAINING_WINDOW = basePath + "pattern_training_window.png";
+            NEXT_BUTTON = basePath + "skip.png";
+            INPUT = basePath + "input.png";
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("Unable to resolve resource path", e);
+        }
+    }
 
     // Counter for character file names
     private static int characterCounter = 1;
