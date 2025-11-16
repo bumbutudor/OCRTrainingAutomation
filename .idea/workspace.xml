@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="6d05d7a2-8ff5-4e05-a450-0e62e47881e5" name="Changes" comment="Added training">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/AddLettersToVectorDB.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/AddLettersToVectorDB.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,7 +33,6 @@
   &quot;associatedIndex&quot;: 0
 }</component>
   <component name="ProjectId" id="2nw3XFu9sp6Omi0HuZyBKbKoQOv" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -105,10 +104,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.OCR_Vector_API" />
         <item itemvalue="Application.VectorOCRAPI" />
         <item itemvalue="Application.VectorOCRAPI" />
-        <item itemvalue="Python.OCR_Vector_API" />
       </list>
     </recent_temporary>
   </component>
