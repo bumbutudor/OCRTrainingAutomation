@@ -36,10 +36,12 @@ public class Main {
     private static final int CONTEXT_PADDING = 30;
     private static final float PATTERN_SCALE = 0.5f; // 2880x1800 @200% -> 1440x900 logic
     private static final double ICON_SIMILARITY = 0.8;
-    private static final double TEXT_SIMILARITY = 0.5;
+    private static final double TEXT_SIMILARITY = 0.3;
     private static final double INPUT_SIMILARITY = 0.7;
     private static final double TRAIN_BUTTON_SIMILARITY = 0.7;
     private static final double HIGHLIGHT_DURATION = 0.8;
+    private static final int PATTERN_RETRY_ATTEMPTS = 5;
+    private static final int PATTERN_RETRY_TIMEOUT = 3;
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     // Contor pentru numele fișierelor de caractere
@@ -74,12 +76,12 @@ public class Main {
             while (true) {
                 Thread.sleep(1000); // Pauză pentru stabilizarea interfeței
 
-                // 1. Găsește zona cu text folosind pattern-ul text.png
+                // 1. Găsește zona cu text folosind pattern-ul text.png (cu retry)
                 Pattern textPattern = loadPattern(TEXT, TEXT_SIMILARITY);
-                Match textMatch = screen.exists(textPattern, 5);
+                Match textMatch = waitForPattern(textPattern, PATTERN_RETRY_ATTEMPTS, PATTERN_RETRY_TIMEOUT);
                 
                 if (textMatch == null) {
-                    log("Pattern-ul text.png nu a fost gasit. Opresc automarea.");
+                    log("Pattern-ul text.png nu a fost gasit dupa %d incercari. Opresc automarea.", PATTERN_RETRY_ATTEMPTS);
                     break;
                 }
 
@@ -103,28 +105,51 @@ public class Main {
                 if (recognizedCharacter != null && !recognizedCharacter.isEmpty()) {
                     log("Caracter #%d recunoscut: '%s'", characterCounter, recognizedCharacter);
 
-                    // 4. Copiază caracterul recunoscut în clipboard și plasează în input
-                    copyTextToClipboard(recognizedCharacter);
-
-                    // Interacționează cu caseta de input
+                    // 4. Mai întâi curăță caseta de input înainte de căutare
                     Pattern inputBoxPattern = loadPattern(INPUT, INPUT_SIMILARITY);
-                    log("Cautam caseta de input folosind %s", INPUT);
-                    screen.wait(inputBoxPattern, 15);
-                    Region inputBoxRegion = screen.find(inputBoxPattern);
-                    outlineRegion(inputBoxRegion, "yellow");
-
-                    screen.click(inputBoxRegion);
+                    log("Cautam caseta de input pentru curatare folosind %s", INPUT);
+                    Match inputMatchPreClean = waitForPattern(inputBoxPattern, PATTERN_RETRY_ATTEMPTS, PATTERN_RETRY_TIMEOUT);
+                    if (inputMatchPreClean == null) {
+                        log("Caseta de input nu a fost gasita pentru curatare. Opresc automarea.");
+                        break;
+                    }
+                    
+                    // Curăță caseta de input
+                    screen.click(inputMatchPreClean);
                     screen.type("a", KeyModifier.CTRL);
                     screen.type(Key.BACKSPACE);
+                    Thread.sleep(500); // Pauză pentru ca UI să se actualizeze
+                    
+                    // Acum caută din nou caseta de input curată pentru a introduce caracterul
+                    log("Cautam din nou caseta de input curatata folosind %s", INPUT);
+                    Match inputMatch = waitForPattern(inputBoxPattern, PATTERN_RETRY_ATTEMPTS, PATTERN_RETRY_TIMEOUT);
+                    if (inputMatch == null) {
+                        log("Caseta de input curatata nu a fost gasita dupa %d incercari. Opresc automarea.", PATTERN_RETRY_ATTEMPTS);
+                        break;
+                    }
+                    outlineRegion(inputMatch, "yellow");
+
+                    // Copiază caracterul recunoscut în clipboard și plasează în input
+                    copyTextToClipboard(recognizedCharacter);
+                    screen.click(inputMatch);
                     screen.type("v", KeyModifier.CTRL);
 
-                    // 5. Apasă butonul "Train"
-                    Pattern nextButtonPattern = loadPattern(TRAIN, TRAIN_BUTTON_SIMILARITY);
+                    // 5. Apasă butonul "Train" (cu retry)
+                    Pattern trainButtonPattern = loadPattern(TRAIN, TRAIN_BUTTON_SIMILARITY);
                     log("Cautam butonul Train (%s)", TRAIN);
-                    screen.wait(nextButtonPattern, 10);
-                    Region trainButtonRegion = screen.find(nextButtonPattern);
-                    outlineRegion(trainButtonRegion, "magenta");
-                    screen.click(trainButtonRegion);
+                    Match trainMatch = waitForPattern(trainButtonPattern, PATTERN_RETRY_ATTEMPTS, PATTERN_RETRY_TIMEOUT);
+                    if (trainMatch == null) {
+                        log("Butonul Train nu a fost gasit dupa %d incercari. Opresc automarea.", PATTERN_RETRY_ATTEMPTS);
+                        break;
+                    }
+                    outlineRegion(trainMatch, "magenta");
+                    screen.click(trainMatch);
+                    
+                    // 6. Curăță câmpul de input după Train - pur și simplu apasă Backspace
+                    Thread.sleep(500); // Pauză pentru ca UI să proceseze Train
+                    log("Curatam campul de input cu Backspace");
+                    screen.type(Key.BACKSPACE);
+                    log("Backspace trimis pentru curatare");
                 } else {
                     log("Recognizer-ul nu a intors un caracter valid pentru intrarea #%d", characterCounter);
                 }
@@ -280,22 +305,21 @@ public class Main {
         return pattern;
     }
 
-    private static Region waitForRegion(Pattern pattern, int attempts, int timeoutSeconds) throws FindFailed {
-        Region region = null;
+    private static Match waitForPattern(Pattern pattern, int attempts, int timeoutSeconds) {
+        Match match = null;
         for (int attempt = 1; attempt <= attempts; attempt++) {
             log("(Retry %d/%d) asteptam pattern-ul %s cu timeout %ds", attempt, attempts, pattern.getFilename(), timeoutSeconds);
-            Match match = screen.exists(pattern, timeoutSeconds);
+            match = screen.exists(pattern, timeoutSeconds);
             if (match != null) {
-                region = match;
                 log("Pattern-ul a fost gasit la %s in incercarea %d", match.getRect(), attempt);
-                break;
+                return match;
             }
             try {
                 Thread.sleep(1000L * attempt);
             } catch (InterruptedException ignored) {
             }
         }
-        return region;
+        return null;
     }
 
     private static void log(String message, Object... args) {
