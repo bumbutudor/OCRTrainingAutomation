@@ -1,157 +1,139 @@
 package org.example;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.sikuli.script.*;
 import java.awt.datatransfer.*;
 import java.awt.image.BufferedImage;
 import java.awt.Toolkit;
 import java.awt.Color;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.file.Files;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 
 public class Main {
     private static Screen screen = new Screen();
 
-    private static final String IMAGE_FOLDER = "C:\\Users\\mariu\\Desktop\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\Screen2\\";
-    private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR15_icon.png";
-    private static final String PATTERN_TRAINING_WINDOW = IMAGE_FOLDER + "pattern_training_window.png";
-    private static final String NEXT_BUTTON = IMAGE_FOLDER + "skip.png"; // Imaginea butonului "Skip" sau "Train"
+    private static final String IMAGE_FOLDER = "D:\\Disk D 13-09-25\\CS\\OCRTrainingAutomation\\src\\main\\resources\\FineReaderAutomation\\Screen2\\";
+    private static final String FINEREADER_ICON = IMAGE_FOLDER + "FR16_icon.png";
+    private static final String TEXT = IMAGE_FOLDER + "text.png";
     private static final String INPUT = IMAGE_FOLDER + "input.png"; // Imaginea casetei de input
     private static final String TRAIN = IMAGE_FOLDER + "train.png";
+    private static final URI OCR_SERVICE_URI = URI.create("http://localhost:8000/predict");
+    private static final int CONTEXT_PADDING = 30;
+    private static final float PATTERN_SCALE = 0.5f; // 2880x1800 @200% -> 1440x900 logic
+    private static final double ICON_SIMILARITY = 0.8;
+    private static final double TEXT_SIMILARITY = 0.5;
+    private static final double INPUT_SIMILARITY = 0.7;
+    private static final double TRAIN_BUTTON_SIMILARITY = 0.7;
+    private static final double HIGHLIGHT_DURATION = 0.8;
+    private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     // Contor pentru numele fișierelor de caractere
     private static int characterCounter = 1;
+    private static File diagnosticsDirectory;
 
     public static void main(String[] args) {
         try {
             // Creează un folder de output unic pentru sesiune
             String uniqueOutputFolder = IMAGE_FOLDER + "output_" + UUID.randomUUID().toString() + "\\";
-            File outputDir = new File(uniqueOutputFolder);
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
-            }
+            ensureDirectory(uniqueOutputFolder);
+            File diagnosticsDir = ensureDirectory(uniqueOutputFolder + "diagnostics\\");
+            diagnosticsDirectory = diagnosticsDir;
 
             // Pasul 1: Deschide ABBYY FineReader
-            Pattern fineReaderIconPattern = new Pattern(FINEREADER_ICON);
-            screen.wait(fineReaderIconPattern, 10);
-            screen.doubleClick(fineReaderIconPattern); // Deschide programul
+            log("Pregatim cautarea iconitei FineReader (%s)", FINEREADER_ICON);
+            Pattern fineReaderIconPattern = loadPattern(FINEREADER_ICON, ICON_SIMILARITY);
+            Match iconMatch = screen.exists(fineReaderIconPattern, 10);
+            if (iconMatch != null) {
+                log("Iconita gasita la %s, executam double-click", iconMatch.getRect());
+                outlineRegion(iconMatch, "blue");
+                screen.doubleClick(iconMatch); // Deschide programul
+            } else {
+                log("Iconita FineReader nu a fost gasita in 10s. Continuam sa cautam fereastra deschisa.");
+            }
 
             // Așteaptă ca FineReader să se deschidă complet
-            Pattern patternTrainingWindowPattern = new Pattern(PATTERN_TRAINING_WINDOW);
-            screen.wait(patternTrainingWindowPattern, 15);
-            Region trainingWindowRegion = screen.find(patternTrainingWindowPattern);
-
-            // Verifică dacă regiunea a fost găsită
-            if (trainingWindowRegion == null) {
-                System.out.println("Nu a fost găsită fereastra de antrenare!");
-                return;
-            }
+            Thread.sleep(3000);
+            log("Incepem ciclul de antrenare.");
 
             // Bucla principală pentru procesarea caracterelor
             while (true) {
                 Thread.sleep(1000); // Pauză pentru stabilizarea interfeței
 
-                // Capturează imaginea ferestrei de antrenare
-                ScreenImage trainingWindowImage = screen.capture(trainingWindowRegion);
-                BufferedImage trainingBufferedImage = trainingWindowImage.getImage();
-
-                // Salvează imaginea ferestrei de antrenare pentru verificare (opțional)
-                File trainingWindowFile = new File(uniqueOutputFolder + "last_training_window.png");
-                ImageIO.write(trainingBufferedImage, "png", trainingWindowFile);
-                System.out.println("Screenshot al ferestrei de antrenare salvat la: " + trainingWindowFile.getAbsolutePath());
-
-                // Detectează caseta verde în imagine
-                Region greenBoxRegion = detectGreenBox(trainingWindowRegion, trainingBufferedImage);
-
-                if (greenBoxRegion == null) {
-                    System.out.println("Nu a fost găsită caseta verde în fereastra de antrenare!");
-                    break; // Ieși din buclă dacă nu mai există caseta verde
+                // 1. Găsește zona cu text folosind pattern-ul text.png
+                Pattern textPattern = loadPattern(TEXT, TEXT_SIMILARITY);
+                Match textMatch = screen.exists(textPattern, 5);
+                
+                if (textMatch == null) {
+                    log("Pattern-ul text.png nu a fost gasit. Opresc automarea.");
+                    break;
                 }
 
-                // Evidențiază regiunea casetei verzi timp de 1 secundă
-                greenBoxRegion.highlight(1); // Evidențiază timp de 1 secundă
+                log("Pattern text.png gasit la %s", textMatch.getRect());
+                outlineRegion(textMatch, "cyan");
 
-                // Capturează imaginea caracterului din caseta verde
-                ScreenImage characterImage = screen.capture(greenBoxRegion);
-                BufferedImage characterBufferedImage = characterImage.getImage();
+                // 2. Capturează întreaga zonă de text
+                ScreenImage textImage = screen.capture(textMatch);
+                BufferedImage textBufferedImage = textImage.getImage();
 
-                // Salvează imaginea originală a caracterului
-                String originalCharacterImagePath = uniqueOutputFolder + "character_" + characterCounter + "_original.png";
-                File originalCharacterImageFile = new File(originalCharacterImagePath);
-                ImageIO.write(characterBufferedImage, "png", originalCharacterImageFile);
-                System.out.println("Imaginea originală a caracterului a fost salvată la: " + originalCharacterImageFile.getAbsolutePath());
+                // Salvează imaginea zonei de text pentru verificare
+                File textFile = new File(uniqueOutputFolder + "text_region_" + characterCounter + ".png");
+                ImageIO.write(textBufferedImage, "png", textFile);
+                log("Zona de text capturata la %s", textFile.getAbsolutePath());
 
-                // Procesează imaginea pentru a elimina pixeli diferiți de negru
-                BufferedImage processedCharacterImage = processCharacterImage(characterBufferedImage);
-
-                // Salvează imaginea procesată a caracterului
-                String processedCharacterImagePath = uniqueOutputFolder + "character_" + characterCounter + "_processed.png";
-                File processedCharacterImageFile = new File(processedCharacterImagePath);
-                ImageIO.write(processedCharacterImage, "png", processedCharacterImageFile);
-                System.out.println("Imaginea procesată a caracterului a fost salvată la: " + processedCharacterImageFile.getAbsolutePath());
-
-                // Trimite imaginea procesată la API și obține caracterul recunoscut
-                String recognizedCharacter = recognizeCharacter(processedCharacterImageFile.getAbsolutePath());
+                // 3. Trimite imaginea la API și obține caracterul recunoscut
+                List<BufferedImage> contextImages = new ArrayList<>();
+                contextImages.add(textBufferedImage);
+                String recognizedCharacter = recognizeCharacter(textBufferedImage, contextImages);
 
                 if (recognizedCharacter != null && !recognizedCharacter.isEmpty()) {
-                    System.out.println("Caracter recunoscut: " + recognizedCharacter);
+                    log("Caracter #%d recunoscut: '%s'", characterCounter, recognizedCharacter);
 
-                    // Copiază caracterul recunoscut în clipboard
+                    // 4. Copiază caracterul recunoscut în clipboard și plasează în input
                     copyTextToClipboard(recognizedCharacter);
 
-                    // Interacționează cu caseta de input pentru a insera caracterul recunoscut
-                    Pattern inputBoxPattern = new Pattern(INPUT);
+                    // Interacționează cu caseta de input
+                    Pattern inputBoxPattern = loadPattern(INPUT, INPUT_SIMILARITY);
+                    log("Cautam caseta de input folosind %s", INPUT);
                     screen.wait(inputBoxPattern, 15);
                     Region inputBoxRegion = screen.find(inputBoxPattern);
+                    outlineRegion(inputBoxRegion, "yellow");
 
-                    // Plasează mouse-ul pe caseta de input și face click
                     screen.click(inputBoxRegion);
+                    screen.type("a", KeyModifier.CTRL);
+                    screen.type(Key.BACKSPACE);
+                    screen.type("v", KeyModifier.CTRL);
 
-                    // Șterge tot din casetă (Ctrl+A și Backspace)
-                    screen.type("a", KeyModifier.CTRL); // Selectează tot textul
-                    screen.type(Key.BACKSPACE); // Șterge textul selectat
-
-                    // Lipește caracterul din clipboard (Ctrl+V)
-                    screen.type("v", KeyModifier.CTRL); // Simulează Ctrl+V pentru a lipi textul
-
-                    // Apasă butonul "Train"
-                    Pattern nextButtonPattern = new Pattern(TRAIN);
+                    // 5. Apasă butonul "Train"
+                    Pattern nextButtonPattern = loadPattern(TRAIN, TRAIN_BUTTON_SIMILARITY);
+                    log("Cautam butonul Train (%s)", TRAIN);
                     screen.wait(nextButtonPattern, 10);
-                    screen.click(nextButtonPattern);
-
-                    // Opțional: Mută imaginea procesată în folderul caracterului
-                    String characterFolderPath = uniqueOutputFolder + recognizedCharacter + "\\";
-                    File characterFolder = new File(characterFolderPath);
-                    if (!characterFolder.exists()) {
-                        characterFolder.mkdirs();
-                        System.out.println("Folder creat pentru caracterul: " + recognizedCharacter);
-                    }
-
-                    // Mută imaginea procesată în folderul caracterului
-                    File sourceFile = processedCharacterImageFile;
-                    File destFile = new File(characterFolderPath + sourceFile.getName());
-
-                    boolean success = sourceFile.renameTo(destFile);
-                    if (success) {
-                        System.out.println("Imaginea procesată a caracterului a fost mutată în folderul: " + destFile.getAbsolutePath());
-                    } else {
-                        System.out.println("Eroare la mutarea imaginii procesate a caracterului.");
-                    }
-
+                    Region trainButtonRegion = screen.find(nextButtonPattern);
+                    outlineRegion(trainButtonRegion, "magenta");
+                    screen.click(trainButtonRegion);
                 } else {
-                    System.out.println("Eroare la recunoașterea caracterului din imagine.");
+                    log("Recognizer-ul nu a intors un caracter valid pentru intrarea #%d", characterCounter);
                 }
 
                 // Crește contorul pentru următorul caracter
                 characterCounter++;
             }
 
-            System.out.println("Procesarea caracterelor s-a încheiat.");
+            log("Procesarea caracterelor s-a incheiat.");
 
         } catch (FindFailed e) {
             e.printStackTrace();
@@ -163,111 +145,65 @@ public class Main {
     }
 
 
-    // Metoda pentru a trimite imaginea la API și a obține caracterul recunoscut
-    public static String recognizeCharacter(String imagePath) {
-        String urlString = "http://localhost:8000/predict/"; // Înlocuiți cu URL-ul corect al API-ului dvs.
-
+    // Metoda pentru a trimite imaginile la API-ul FastAPI și a prelua caracterul recunoscut
+    public static String recognizeCharacter(BufferedImage primaryImage, List<BufferedImage> contextImages) {
         try {
-            // Deschide o conexiune către API
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            JsonObject payload = new JsonObject();
+            payload.add("primary_image", buildImagePayload(primaryImage));
+
+            JsonArray contextArray = new JsonArray();
+            for (BufferedImage contextImage : contextImages) {
+                if (contextImage != null) {
+                    contextArray.add(buildImagePayload(contextImage));
+                }
+            }
+            payload.add("context_images", contextArray);
+
+            byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
+
+            HttpURLConnection connection = (HttpURLConnection) OCR_SERVICE_URI.toURL().openConnection();
             connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=---ContentBoundary");
+            connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
 
-            // Creează corpul multipart
-            OutputStream outputStream = connection.getOutputStream();
-            outputStream.write(("-----ContentBoundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" +
-                    new File(imagePath).getName() + "\"\r\nContent-Type: image/png\r\n\r\n").getBytes());
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                outputStream.write(body);
+            }
 
-            // Scrie bytes-urile fișierului imagine în fluxul de ieșire
-            Files.copy(new File(imagePath).toPath(), outputStream);
-            outputStream.write("\r\n-----ContentBoundary--\r\n".getBytes());
-            outputStream.flush();
-            outputStream.close();
+            int status = connection.getResponseCode();
+            InputStream responseStream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
 
-            // Obține răspunsul
-            int responseCode = connection.getResponseCode();
-            if (responseCode == 200) {
-                String response = new String(connection.getInputStream().readAllBytes());
-                System.out.println("Răspuns de la API: " + response);
-
-                // Elimină ghilimelele de la început și sfârșit, dacă există
-                response = response.trim();
-                if (response.startsWith("\"") && response.endsWith("\"") && response.length() >= 2) {
-                    response = response.substring(1, response.length() - 1);
-                }
-
-                return response;
-            } else {
-                System.err.println("Eroare la apelul API: " + responseCode);
+            if (responseStream == null) {
+                log("Nu exista raspuns de la API-ul OCR.");
                 return null;
             }
+
+            String responseBody;
+            try (InputStream stream = responseStream) {
+                responseBody = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+
+            if (status != HttpURLConnection.HTTP_OK) {
+                log("Eroare API (%d): %s", status, responseBody);
+                return null;
+            }
+
+            JsonObject jsonResponse = JsonParser.parseString(responseBody).getAsJsonObject();
+            if (jsonResponse.has("prediction")) {
+                return jsonResponse.get("prediction").getAsString();
+            }
+
+            log("Raspunsul API nu contine campul prediction: %s", responseBody);
         } catch (IOException e) {
             e.printStackTrace();
-            return null;
         }
+        return null;
     }
 
 
-    // Metoda pentru a detecta caseta verde în imagine
-    public static Region detectGreenBox(Region trainingWindowRegion, BufferedImage trainingBufferedImage) {
-        // Definim culoarea verde specifică casetei
-        Color targetColor = new Color(128, 220, 128, 255); // Ajustează valorile RGB dacă este necesar
-        int colorTolerance = 30; // Toleranța culorii (poți ajusta această valoare)
-
-        // Variabile pentru coordonate
-        int minX = trainingBufferedImage.getWidth();
-        int minY = trainingBufferedImage.getHeight();
-        int maxX = 0;
-        int maxY = 0;
-
-        // Parcurgem pixelii imaginii, începând de la stânga
-        for (int x = 0; x < trainingBufferedImage.getWidth(); x++) {
-            for (int y = 0; y < trainingBufferedImage.getHeight(); y++) {
-                int pixelColor = trainingBufferedImage.getRGB(x, y);
-                Color color = new Color(pixelColor, true); // Al doilea parametru 'true' pentru a include alfa
-
-                // Verificăm dacă pixelul este verde în limitele toleranței
-                if (isColorMatch(color, targetColor, colorTolerance)) {
-                    // Actualizăm coordonatele extreme
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-            }
-        }
-
-        // Verificăm dacă am găsit coordonatele casetei verzi
-        if (minX >= maxX || minY >= maxY) {
-            return null; // Caseta verde nu a fost găsită
-        }
-
-        // Determinăm coordonatele casetei verzi în raport cu ecranul
-        int greenBoxX = trainingWindowRegion.getX() + minX;
-        int greenBoxY = trainingWindowRegion.getY() + minY;
-        int greenBoxW = maxX - minX + 1;
-        int greenBoxH = maxY - minY + 1;
-
-        // Creăm regiunea casetei verzi
-        Region greenBoxRegion = new Region(greenBoxX, greenBoxY, greenBoxW, greenBoxH);
-
-        return greenBoxRegion;
-    }
-
-
-
-    // Metodă pentru a verifica dacă două culori se potrivesc în limitele unei toleranțe
-    public static boolean isColorMatch(Color c1, Color c2, int tolerance) {
-        int diffRed = Math.abs(c1.getRed() - c2.getRed());
-        int diffGreen = Math.abs(c1.getGreen() - c2.getGreen());
-        int diffBlue = Math.abs(c1.getBlue() - c2.getBlue());
-
-        return (diffRed <= tolerance) && (diffGreen <= tolerance) && (diffBlue <= tolerance);
-    }
-
-// Metoda pentru a procesa imaginea caracterului, păstrând toate nuanțele de gri
+    // Metoda pentru a procesa imaginea caracterului, păstrând toate nuanțele de gri
     public static BufferedImage processCharacterImage(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
@@ -293,6 +229,33 @@ public class Main {
         return processedImage;
     }
 
+    private static BufferedImage captureContextImage(Region baseRegion) {
+        if (baseRegion == null) {
+            return null;
+        }
+
+        int x = Math.max(baseRegion.getX() - CONTEXT_PADDING, 0);
+        int y = Math.max(baseRegion.getY() - CONTEXT_PADDING, 0);
+        int width = baseRegion.getW() + CONTEXT_PADDING * 2;
+        int height = baseRegion.getH() + CONTEXT_PADDING * 2;
+        Region expandedRegion = new Region(x, y, width, height);
+        ScreenImage contextCapture = screen.capture(expandedRegion);
+        return contextCapture != null ? contextCapture.getImage() : null;
+    }
+
+    private static JsonObject buildImagePayload(BufferedImage image) throws IOException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("data", encodeImageToBase64(image));
+        payload.addProperty("mime_type", "image/png");
+        return payload;
+    }
+
+    private static String encodeImageToBase64(BufferedImage image) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", outputStream);
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
     public static void copyTextToClipboard(String text) {
         StringSelection stringSelection = new StringSelection(text);
         Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -304,6 +267,40 @@ public class Main {
         TransferableImage trans = new TransferableImage(image);
         Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
         c.setContents(trans, null);
+    }
+
+    private static Pattern loadPattern(String path, double similarity) {
+        Pattern pattern = new Pattern(path);
+        pattern = pattern.similar((float) similarity);
+        if (PATTERN_SCALE != 1.0f) {
+            log("Redimensionam pattern-ul %s cu factor %.2f", path, PATTERN_SCALE);
+            pattern = pattern.resize(PATTERN_SCALE);
+        }
+        log("Pattern-ul %s foloseste similarity=%.2f", path, similarity);
+        return pattern;
+    }
+
+    private static Region waitForRegion(Pattern pattern, int attempts, int timeoutSeconds) throws FindFailed {
+        Region region = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            log("(Retry %d/%d) asteptam pattern-ul %s cu timeout %ds", attempt, attempts, pattern.getFilename(), timeoutSeconds);
+            Match match = screen.exists(pattern, timeoutSeconds);
+            if (match != null) {
+                region = match;
+                log("Pattern-ul a fost gasit la %s in incercarea %d", match.getRect(), attempt);
+                break;
+            }
+            try {
+                Thread.sleep(1000L * attempt);
+            } catch (InterruptedException ignored) {
+            }
+        }
+        return region;
+    }
+
+    private static void log(String message, Object... args) {
+        String formatted = args.length == 0 ? message : String.format(message, args);
+        System.out.println("[Automation] " + formatted);
     }
 
     // Clasă internă pentru a face imaginea transferabilă în clipboard
@@ -328,6 +325,61 @@ public class Main {
 
         public boolean isDataFlavorSupported(DataFlavor flavor) {
             return flavor.equals(DataFlavor.imageFlavor);
+        }
+    }
+
+    private static File ensureDirectory(String path) {
+        File dir = new File(path);
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            if (!created) {
+                log("Nu am putut crea directorul %s", path);
+            }
+        }
+        return dir;
+    }
+
+    private static void saveScreenshot(Screen screen, File directory, String baseName, Region region) {
+        if (screen == null || directory == null) {
+            return;
+        }
+        ScreenImage capture = region != null ? screen.capture(region) : screen.capture();
+        if (capture == null) {
+            log("Nu s-a putut capta screenshot-ul pentru %s", baseName);
+            return;
+        }
+        String filename = baseName.replace(".png", "") + "_" + TIMESTAMP.format(LocalDateTime.now()) + ".png";
+        File target = new File(directory, filename);
+        try {
+            ImageIO.write(capture.getImage(), "png", target);
+            log("Screenshot salvat la %s", target.getAbsolutePath());
+        } catch (IOException e) {
+            log("Nu am putut salva screenshot-ul la %s: %s", target.getAbsolutePath(), e.getMessage());
+        }
+    }
+
+    private static void saveDiagnosticImage(BufferedImage image, String baseName) {
+        if (diagnosticsDirectory == null || image == null) {
+            return;
+        }
+        String filename = baseName.replace(".png", "") + "_" + TIMESTAMP.format(LocalDateTime.now()) + ".png";
+        File target = new File(diagnosticsDirectory, filename);
+        try {
+            ImageIO.write(image, "png", target);
+            log("Imagine diagnostica salvata la %s", target.getAbsolutePath());
+        } catch (IOException e) {
+            log("Nu am putut salva imaginea diagnostica la %s: %s", target.getAbsolutePath(), e.getMessage());
+        }
+    }
+
+    private static void outlineRegion(Region region, String colorName) {
+        if (region == null) {
+            return;
+        }
+        try {
+            region.highlight(HIGHLIGHT_DURATION, colorName);
+        } catch (Exception e) {
+            log("Nu am putut afisa chenarul pentru regiune: %s", e.getMessage());
         }
     }
 
